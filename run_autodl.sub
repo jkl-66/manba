@@ -1,0 +1,57 @@
+#!/bin/bash
+#SBATCH --job-name=cmamba_sa          # Job name
+#SBATCH --partition=gpu               # Partition (queue) name, e.g., gpu, compute
+#SBATCH --nodes=1                     # Minimum number of nodes
+#SBATCH --ntasks-per-node=1           # Number of tasks per node (1 for most PyTorch single-node scripts)
+#SBATCH --cpus-per-task=8             # Number of CPU cores per task
+#SBATCH --gres=gpu:a800:1             # Requesting 1 A800 GPU (change according to AutoDL/cluster config)
+#SBATCH --mem=64G                     # RAM per node
+#SBATCH --time=48:00:00               # Time limit hrs:min:sec
+#SBATCH --output=logs/train_%j.out    # Standard output log (the %j puts the Job ID)
+#SBATCH --error=logs/train_%j.err     # Standard error log
+
+# 1. Print node info
+echo "Job execution start: $(date)"
+echo "Node: $HOSTNAME"
+echo "CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES"
+
+# 2. Setup Conda Environment (Modify the path and env name if needed)
+# source /root/miniconda3/etc/profile.d/conda.sh
+# conda activate causal_mamba
+
+# To run in AutoDL typically you just ensure your PATH is using the base/activated conda env
+# e.g., source activate base
+
+# 3. Create log/output directories
+mkdir -p logs
+mkdir -p autodl_output
+
+# 4. Check Dataset before training
+DATA_PATH="./data/MOSEI/unaligned.pkl"
+if [ ! -f "$DATA_PATH" ]; then
+    echo "ERROR: Data file not found at $DATA_PATH!"
+    echo "Please download the CMU-MOSEI dataset and place the .pkl file accordingly."
+    exit 1
+fi
+
+# 5. Start Training Action
+echo "Starting Causal-MambaSA Training Pipeline..."
+
+python -m src.training.train \
+    --data_path $DATA_PATH \
+    --text_dim 768 \
+    --audio_dim 74 \
+    --vision_dim 35 \
+    --hidden_dim 256 \
+    --batch_size 128 \
+    --epochs 20 \
+    --warmup_epochs 5 \
+    --lr 5e-4 \
+    --weight_decay 1e-2 \
+    --ortho_weight 0.1 \
+    --cf_weight 1.0 \
+    --modality_dropout 0.15 \
+    --device cuda \
+    --save_dir ./autodl_output
+
+echo "Training Completed: $(date)"

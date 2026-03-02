@@ -1,0 +1,13 @@
+torch>=2.0.0
+torchvision
+torchaudio
+mamba-ssm
+causal-conv1d
+numpy
+tqdm
+scipy
+scikit-learn
+pandas
+logging
+argparse
+pickle5; python_version < "3.8"

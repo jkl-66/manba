@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+desktop.ini
+
+# Data & Large Files (Excluded as per request)
+data/
+*.pkl
+*.h5
+*.npy
+*.pth
+
+# Logs & Outputs
+slurm_logs/
+output/
+output_a800/
+*.log
+*.csv
+
+# Environment & IDE
+.venv/
+env/
+venv/
+.env
+.vscode/
+.idea/
+.trae/
+
+# Weights & Checkpoints
+checkpoints/
+best_model.pth
+latest.pth
