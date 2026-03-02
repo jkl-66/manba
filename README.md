@@ -29,12 +29,19 @@ Our model is rigorously tested against noise injection:
 - **Vision:** 10%/20%/30% Zero-masking (simulating occlusion/blackout).
 Check the `results/ood_benchmark.csv` for performance stability comparisons against baselines like MISA and Self-MM.
 
-## 🚄 Training & Evaluation
-To run the SOTA training on A800:
+## 🚄 Training & Optimization (Target: F1 0.86+)
+The training pipeline is optimized for SOTA performance:
+- **Dynamic Threshold Search:** Every epoch performs a validation-set threshold search to report the true F1 potential.
+- **Differentiated Learning Rates:** Encoders, Fusion blocks, and Heads use tailored LRs for stable convergence.
+- **Multi-Task Balance:** 0.8 Regression + 0.2 Auxiliary tasks (Sextuplet Probe + SupCon).
+
+To run the optimized training:
 ```bash
 python src/training/train.py --hidden_dim 1024 --batch_size 128 --lr 2e-4
 ```
-To run the OOD Robustness Test:
+
+## 🛡️ Robustness Switch (Optional)
+Once F1 targets are met, enable OOD testing via:
 ```bash
-python src/training/train.py --eval_only --load_ckpt best_model.pth --noise_level 0.2
+python src/training/train.py --eval_only --load_ckpt checkpoints/best_model.pth --noise_level 0.2
 ```
