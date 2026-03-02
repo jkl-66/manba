@@ -164,6 +164,20 @@ def train(args):
     
     logger.info(f"Starting academic training on {args.device}...")
     
+    if args.eval_only:
+        if args.load_ckpt:
+            model.load_state_dict(torch.load(args.load_ckpt))
+            logger.info(f"Loaded checkpoint from {args.load_ckpt}")
+        
+        if args.noise_level > 0:
+            logger.info(f"=== OOD Robustness Test (Noise Level: {args.noise_level}) ===")
+            results = evaluate_with_noise(model, test_loader, args, noise_level=args.noise_level)
+            for k, v in results.items(): logger.info(f"  OOD_{k.upper()}: {v:.4f}")
+        else:
+            test_results = evaluate_final_standard(model, test_loader, args)
+            for k, v in test_results.items(): logger.info(f"  TEST_{k.upper()}: {v:.4f}")
+        return
+
     for epoch in range(args.epochs):
         model.train()
         train_loss = 0.0
@@ -274,6 +288,37 @@ def evaluate_final_standard(model, loader, args, threshold=0.0):
             all_preds.append(output.cpu().numpy()); all_labels.append(label.cpu().numpy())
     return calc_metrics(np.concatenate(all_preds), np.concatenate(all_labels), threshold=threshold)
 
+def evaluate_with_noise(model, loader, args, noise_level=0.1):
+    """
+    OOD Robustness Test:
+    - Audio: Add Gaussian noise.
+    - Vision: Zero-mask segments.
+    """
+    model.eval()
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for batch in loader:
+            text = batch['text'].to(args.device)
+            audio = batch['audio'].to(args.device)
+            vision = batch['vision'].to(args.device)
+            label = batch['label'].to(args.device).unsqueeze(1)
+            masks = {k: batch[k].to(args.device) for k in ['text_mask', 'audio_mask', 'vision_mask']}
+            
+            # Inject OOD Noise
+            # 1. Audio Gaussian Noise
+            audio_noise = torch.randn_like(audio) * noise_level * torch.std(audio)
+            audio = audio + audio_noise
+            
+            # 2. Vision Zero-masking
+            B, L, D = vision.shape
+            mask_indices = torch.rand(B, L, device=args.device) < noise_level
+            vision[mask_indices] = 0.0
+            
+            output, _ = model(text, audio, vision, label=label, masks=masks, mode='eval', warmup=False)
+            all_preds.append(output.cpu().numpy()); all_labels.append(label.cpu().numpy())
+            
+    return calc_metrics(np.concatenate(all_preds), np.concatenate(all_labels))
+
 def validate_with_metrics(model, loader, criterion, args, epoch, logger=None):
     model.eval()
     val_loss, all_preds, all_labels = 0.0, [], []
@@ -312,6 +357,12 @@ if __name__ == "__main__":
     # Ablation Flags for Paper
     parser.add_argument('--ablation', type=str, default='none', 
                         choices=['none', 'no_causal', 'no_cross_scan', 'no_mtl', 'no_supcon']) 
+    
+    # OOD Robustness Flags
+    parser.add_argument('--eval_only', action='store_true')
+    parser.add_argument('--load_ckpt', type=str, default='')
+    parser.add_argument('--noise_level', type=float, default=0.0)
+    
     parser.add_argument('--lr', type=float, default=2e-4) # Balanced for 1024 dim
     parser.add_argument('--weight_decay', type=float, default=5e-2) # Stronger WD for large model
     parser.add_argument('--ortho_weight', type=float, default=0.2) # Stronger causal constraint

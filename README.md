@@ -1,40 +1,40 @@
-# CausalMambaSA: Hierarchical Causal Token Intervention Mamba for Multimodal Sentiment Analysis
+# Causal-MambaSA: Robust Unaligned Multimodal Sentiment Analysis via Structural Causal Disentanglement and State-Space Models
 
-Official implementation of the **HCTI-Mamba** framework, designed for high-performance and robust multimodal sentiment analysis (MSA).
+Official implementation of **Causal-MambaSA**, a framework designed for robust, fine-grained multimodal sentiment analysis (MSA) in unaligned and long-context scenarios.
 
-## 🚀 Key Innovations
+## 🚀 Core Motivation & Solutions
+
+### 🧠 Pain Point 1: Unaligned & Long-Context Dilemma
+In real-world multimodal dialogues, video and audio signals are often **unaligned** and extremely long. Traditional models either perform aggressive truncation/alignment (losing information) or use Transformers, which suffer from $O(N^2)$ complexity and memory explosion.
+- **Solution 1:** We utilize **Temporal Flattening** combined with **Bi-Mamba-2 (SSD)**, achieving $O(N)$ linear complexity. This ensures full-sequence, fine-grained information retention even for thousands of steps.
+
+### 🛡️ Pain Point 2: Speaker & Environment Bias
+Models often take "shortcuts" by fitting to a speaker's inherent voice (Speaker Bias) or specific background conditions (Environment Bias), leading to catastrophic failure in noisy or Out-of-Distribution (OOD) scenarios.
+- **Solution 2:** We introduce **Structural Causal Models (SCM)** with a **Hierarchical Causal Token Intervention (HCTI)**. By utilizing a two-stage intervention dictionary (Global & Local), we explicitly cut spurious correlations and extract pure sentiment-content features $Z$.
+
+## 🔬 Key Innovations
 
 ### 1. Hierarchical Causal Token Intervention (HCTI)
-Unlike traditional global de-confounding, HCTI introduces a **Hierarchical Memory Bank** to separate dataset-wide global confounders (e.g., speaker style) from batch-specific local confounders. By applying backdoor adjustment at the **token-level**, the model extracts pure sentiment-content features $Z$, significantly enhancing robustness against Out-of-Distribution (OOD) noise.
+HCTI introduces a **Hierarchical Memory Bank** to separate dataset-wide global confounders from batch-specific local confounders. Backdoor adjustment is applied at the **token-level**, enhancing robustness against OOD noise.
 
 ### 2. 4-Way Cross-Scan Deep Mamba Fusion (CS-Mamba)
-We propose a **Cross-Scan** mechanism that parallelizes four scanning paths: forward/backward time and forward/backward modality interaction. This architecture achieves $O(L)$ linear complexity while capturing deep cross-modal synergies equivalent to multi-head cross-attention.
+A **Cross-Scan** mechanism parallelizes four scanning paths: forward/backward time and forward/backward modality interaction, capturing deep cross-modal synergies with $O(L)$ complexity.
 
-## 🛠️ Architecture
+### 3. Weakly-supervised Fine-grained Probe
+To bridge the gap between global polarity labels and fine-grained understanding, we include a **Fine-grained Probe** head. While training only on global labels, the model spontaneously learns to identify "who is expressing what to whom" (Holder, Target, Aspect, etc.) by minimizing causal loss, as demonstrated in our qualitative attention heatmaps.
 
-The model is designed for high-capacity hardware (e.g., A100/A800 80G):
-- **Intra-modal Encoder:** 6-layer stacked Mamba blocks for deep modality-specific abstraction.
-- **Inter-modal Fusion:** 4-layer stacked Cross-Scan Mamba blocks.
-- **Learning Objectives:** Causal Orthogonality + Supervised Contrastive Learning (SupCon) + Multi-task Self-Supervision (MTL).
+## 📊 OOD Robustness Benchmark
+Our model is rigorously tested against noise injection:
+- **Audio:** 10%/20%/30% Gaussian noise (simulating background interference).
+- **Vision:** 10%/20%/30% Zero-masking (simulating occlusion/blackout).
+Check the `results/ood_benchmark.csv` for performance stability comparisons against baselines like MISA and Self-MM.
 
-## 📦 Installation
-
-```bash
-pip install -r requirements.txt
-```
-
-## 🚄 Training & Ablation
-
-To train the full SOTA model on A800:
+## 🚄 Training & Evaluation
+To run the SOTA training on A800:
 ```bash
 python src/training/train.py --hidden_dim 1024 --batch_size 128 --lr 2e-4
 ```
-
-### Ablation Study Commands
-- **No Causal:** `python src/training/train.py --ablation no_causal`
-- **No Cross-Scan:** `python src/training/train.py --ablation no_cross_scan`
-- **No MTL:** `python src/training/train.py --ablation no_mtl`
-
-## 📊 Dataset
-This repository is optimized for the **CMU-MOSEI** dataset (unaligned version).
-Note: Data files should be placed in the `data/` directory (excluded from git).
+To run the OOD Robustness Test:
+```bash
+python src/training/train.py --eval_only --load_ckpt best_model.pth --noise_level 0.2
+```
