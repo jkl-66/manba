@@ -236,8 +236,11 @@ def train(args):
             
         avg_train_loss = train_loss / len(train_loader)
         
-        # Optimized Validation: Dynamic Threshold Search for F1 Max
-        # This reflects the "best potential" of the model, standard in SOTA reporting
+        # Validation with standard 0.0 threshold for academic safety
+        val_metrics = validate_with_metrics(model, valid_loader, criterion, args, epoch, logger=logger)
+        
+        # Log auxiliary potential (DTS) for diagnostic purposes only
+        # Do NOT report this as the main result in the paper's main table
         val_preds, val_labels = [], []
         model.eval()
         with torch.no_grad():
@@ -248,18 +251,12 @@ def train(args):
                 val_preds.append(output.cpu().numpy()); val_labels.append(label.cpu().numpy())
         
         val_preds, val_labels = np.concatenate(val_preds), np.concatenate(val_labels)
-        best_f1_val = -1.0
-        best_thresh_val = 0.0
-        for thresh in np.arange(-0.5, 0.5, 0.01):
+        best_f1_potential = -1.0
+        for thresh in np.arange(-0.2, 0.2, 0.02): # Narrower search for bias detection
             m = calc_metrics(val_preds, val_labels, threshold=thresh)
-            if m['f1'] > best_f1_val:
-                best_f1_val = m['f1']
-                best_thresh_val = thresh
+            if m['f1'] > best_f1_potential: best_f1_potential = m['f1']
         
-        val_metrics = calc_metrics(val_preds, val_labels, threshold=best_thresh_val)
-        val_metrics['loss'] = avg_train_loss # Placeholder or calculate real val loss if needed
-        
-        logger.info(f"Epoch {epoch+1} | Val F1 (Best Thresh {best_thresh_val:.2f}): {val_metrics['f1']:.4f} | MAE: {val_metrics['mae']:.4f}")
+        logger.info(f"Epoch {epoch+1} | Val F1 (Standard 0.0): {val_metrics['f1']:.4f} | Potential Max F1: {best_f1_potential:.4f}")
         
         # Log and Best Model Saving
         log_metrics_to_csv(metrics_csv, {'epoch': epoch+1, 'train_loss': avg_train_loss, **val_metrics})
