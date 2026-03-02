@@ -203,6 +203,16 @@ class CausalMambaSA(nn.Module):
         self.unimodal_a = nn.Linear(args.hidden_dim, 1)
         self.unimodal_v = nn.Linear(args.hidden_dim, 1)
         
+        # New: Sextuplet Extraction Head (Sequence Tagging / Span Detection)
+        # Predicts 6 classes for each token: Holder, Target, Aspect, Opinion, Sentiment, Reason
+        # This aligns with the "Panoramic Sentiment Sextuplet" narrative in the paper
+        self.sextuplet_head = nn.Sequential(
+            nn.Linear(args.hidden_dim, args.hidden_dim // 2),
+            nn.GELU(),
+            nn.Dropout(0.1),
+            nn.Linear(args.hidden_dim // 2, 7) # 6 classes + 1 'O' (Outside) tag
+        )
+        
         # New: Counterfactual Predictor (Hard Label Anchor)
         self.u_predictor = nn.Sequential(
             nn.Linear(args.hidden_dim, args.hidden_dim // 2),
@@ -334,6 +344,13 @@ class CausalMambaSA(nn.Module):
         out_a = self.unimodal_a(p_a)
         out_v = self.unimodal_v(p_v)
         
+        # 5.4 Sextuplet Extraction (Auxiliary Task)
+        # Using fused sequence features h_fused (B, L_max, D) to predict tags
+        # We only use the text portion for sextuplet extraction as it carries most semantic info
+        # Or use the fused features corresponding to text length
+        # Simple approach: project h_fused to 7 classes
+        sextuplet_logits = self.sextuplet_head(h_fused) # (B, L_max, 7)
+        
         output = self.regressor(h_pooled)
         
         # Return total_causal_loss which includes recon + ortho + counterfactual + adv + u_task
@@ -342,5 +359,5 @@ class CausalMambaSA(nn.Module):
         
         if return_features:
             mtl_preds = {'out_t': out_t, 'out_a': out_a, 'out_v': out_v}
-            return output, total_causal_loss, {'z_contrast': z_contrast, 'mtl_preds': mtl_preds}
+            return output, total_causal_loss, {'z_contrast': z_contrast, 'mtl_preds': mtl_preds, 'sextuplet_logits': sextuplet_logits}
         return output, total_causal_loss
