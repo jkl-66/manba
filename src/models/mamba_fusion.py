@@ -13,7 +13,7 @@ except ImportError:
         def forward(self, x):
             return self.linear(x)
 
-from .causal_module import CausalMemoryBank, FeatureSeparator, grad_reverse
+from .causal_module import HierarchicalMemoryBank, FeatureSeparator, grad_reverse
 
 class ModalityWeightGate(nn.Module):
     """
@@ -184,7 +184,11 @@ class CausalMambaSA(nn.Module):
         self.separator_a = FeatureSeparator(args.hidden_dim, args.hidden_dim)
         self.separator_v = FeatureSeparator(args.hidden_dim, args.hidden_dim)
         
-        self.memory_bank = HierarchicalMemoryBank(args.hidden_dim, num_global=64, num_local=32)
+        self.memory_bank = HierarchicalMemoryBank(
+            args.hidden_dim, 
+            num_global=getattr(args, 'num_global', 64), 
+            num_local=getattr(args, 'num_local', 32)
+        )
         
         # Inter-Modality Fusion: Upgraded to Deep Stacked Cross-Scan Mamba
         self.mamba_fusion = CrossScanMamba(args.hidden_dim, num_layers=args.num_fusion_layers)
