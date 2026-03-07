@@ -20,7 +20,7 @@ data/
 # Logs & Outputs
 slurm_logs/
 output/
-output_a800/
+output_*/
 *.log
 *.csv
 
